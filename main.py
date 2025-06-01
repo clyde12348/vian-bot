@@ -1,32 +1,47 @@
 import os
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import openai
-import asyncio
+from flask import Flask, request
 
+app = Flask(__name__)
+
+# إعدادات OpenRouter
 openai.api_key = os.getenv("OPENAI_API_KEY")
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+openai.api_base = "https://openrouter.ai/api/v1"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("هلا والله! أنا ڨيان، صديقتك الذكية 🤖")
+@app.route("/")
+def home():
+    return "بوت ڨيان شغال 🤖✨"
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_text = update.message.text
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.get_json()
 
-    response = await openai.ChatCompletion.acreate(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "أنت بوت ذكي، تحچي عراقي وتجاوب بكل حرية."},
-            {"role": "user", "content": user_text},
-        ],
-    )
-    answer = response.choices[0].message.content
-    await update.message.reply_text(answer)
+    if "message" in data and "text" in data["message"]:
+        user_message = data["message"]["text"]
+        chat_id = data["message"]["chat"]["id"]
 
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+        response = openai.ChatCompletion.create(
+            model="mistralai/mistral-7b-instruct",
+            messages=[
+                {"role": "system", "content": "انت ڨيان، صديقة مجنونة تحچي باللهجة العراقية وتعشق الهوسة 😂"},
+                {"role": "user", "content": user_message}
+            ]
+        )
 
-    print("ڨيان اشتغلت!")
-    app.run_polling()
+        bot_reply = response["choices"][0]["message"]["content"]
+
+        send_message(chat_id, bot_reply)
+
+    return "ok"
+
+import requests
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+def send_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
+    requests.post(url, json=payload)
